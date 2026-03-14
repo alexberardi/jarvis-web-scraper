@@ -1,0 +1,14 @@
+pyproject.toml
+jarvis_web_scraper/__init__.py
+jarvis_web_scraper/client.py
+jarvis_web_scraper/extractor.py
+jarvis_web_scraper/fetcher.py
+jarvis_web_scraper/models.py
+jarvis_web_scraper.egg-info/PKG-INFO
+jarvis_web_scraper.egg-info/SOURCES.txt
+jarvis_web_scraper.egg-info/dependency_links.txt
+jarvis_web_scraper.egg-info/requires.txt
+jarvis_web_scraper.egg-info/top_level.txt
+tests/test_client.py
+tests/test_extractor.py
+tests/test_fetcher.py
