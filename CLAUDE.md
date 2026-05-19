@@ -118,3 +118,21 @@ URL → fetch_html() → raw HTML
 
 - **GitHub Actions**: `.github/workflows/test.yml` — pytest on push/PR to main, 70% coverage threshold
 - **No Docker build** — this is a library, not a service
+
+## Invariants & gotchas
+
+1. **Private hosts blocked by default.** `FetchConfig(block_private_hosts=True)` rejects `localhost`, `127.*`, `10.*`, `192.168.*`, `172.16-31.*` to prevent SSRF. Only flip this off if you genuinely need to scrape internal services.
+2. **`r.jina.ai` is the fallback proxy.** Used on 401/403 retry-fail and timeout/connection-error. This means private/auth-required content may be retrieved via a third-party proxy — be aware of data exfiltration concerns when scraping sensitive URLs.
+3. **trafilatura is the primary extractor; BeautifulSoup is the fallback.** Don't reorder. trafilatura is statistically better at "main content" extraction; BS picks up everything including nav/footer/script and is the safety net.
+4. **`batch_fetch` uses a semaphore.** Default `max_concurrent` is conservative; bumping it without checking the target site's rate limit will get you 429'd or IP-banned.
+5. **No persistent HTTP session.** Each fetch opens a new connection. For high-throughput scrapes of one host, the library is inefficient — but that's not its use case (deep research scrapes 5-10 disparate URLs at a time).
+6. **Encoding detection is opportunistic.** Content-Type charset → meta charset → UTF-8. Sites that declare wrong charset get garbled text. There's no auto-detection (chardet) — adding it would slow batch fetch significantly.
+
+## Used by
+
+- **jarvis-command-center** — deep research tool batch-scrapes search results for LLM summarization
+- **jarvis-recipes-server** — would be the migration target for the inline `html_fetcher.py` (currently still inline)
+
+## Stability
+
+Pre-1.0 — API may change between minor versions. The `WebScraper` / `ScrapedPage` / `FetchConfig` shapes are unlikely to change, but the fetch resilience pipeline (proxy fallbacks, retry strategy) is still being tuned.
