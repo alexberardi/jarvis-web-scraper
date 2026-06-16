@@ -106,8 +106,9 @@ URL → fetch_html() → raw HTML
 .venv/bin/pytest -v --tb=short
 ```
 
-27 tests covering:
+70 tests covering:
 - URL validation and private host blocking
+- SSRF hardening (`tests/test_fetcher_ssrf.py`): IPv6/IPv4-mapped/NAT64/CGNAT blocklist, DNS resolution + fail-closed, per-redirect-hop revalidation, non-http/relative/protocol-relative redirect targets, max_redirects bounds, cross-origin header stripping
 - Encoding detection and fallback
 - Content extraction (article, nav/footer stripping, scripts)
 - Batch fetch with partial failures
@@ -121,8 +122,8 @@ URL → fetch_html() → raw HTML
 
 ## Invariants & gotchas
 
-1. **Private hosts blocked by default.** `FetchConfig(block_private_hosts=True)` rejects `localhost`, `127.*`, `10.*`, `192.168.*`, `172.16-31.*` to prevent SSRF. Only flip this off if you genuinely need to scrape internal services.
-2. **`r.jina.ai` is the fallback proxy.** Used on 401/403 retry-fail and timeout/connection-error. This means private/auth-required content may be retrieved via a third-party proxy — be aware of data exfiltration concerns when scraping sensitive URLs.
+1. **Private hosts blocked by default — DNS-resolving, IPv6-safe, per-redirect-hop.** `FetchConfig(block_private_hosts=True)` rejects loopback, private, link-local (incl. cloud-metadata `169.254.169.254` / `fe80::/10`), reserved (incl. NAT64), multicast, unspecified, and CGNAT `100.64/10` — for IPv4 **and** IPv6 — *after resolving hostnames via DNS* (a public name with a private A-record is caught; if **any** resolved address is private it's blocked). Crucially, **every redirect hop is re-validated**, not just the initial URL (`follow_redirects=False` + a manual walk in `_fetch_following_redirects`), and unresolvable hosts **fail closed**. `is_private_host(host)` is the sync form; the fetch path uses async `_host_blocked`. Callers must pass a bare host (`urlparse().hostname`) — do **not** split on `:` (that mangled IPv6, the original SSRF bug). Only flip `block_private_hosts` off if you genuinely need to scrape internal services.
+2. **`r.jina.ai` is the fallback proxy.** Used on 401/403 retry-fail and timeout/connection-error. Because the original URL is DNS-validated *before* the fallback runs, an internal/private target is never proxied through Jina — but the target URL is still sent to a third party, so be aware of **data-egress** concerns when scraping sensitive URLs.
 3. **trafilatura is the primary extractor; BeautifulSoup is the fallback.** Don't reorder. trafilatura is statistically better at "main content" extraction; BS picks up everything including nav/footer/script and is the safety net.
 4. **`batch_fetch` uses a semaphore.** Default `max_concurrent` is conservative; bumping it without checking the target site's rate limit will get you 429'd or IP-banned.
 5. **No persistent HTTP session.** Each fetch opens a new connection. For high-throughput scrapes of one host, the library is inefficient — but that's not its use case (deep research scrapes 5-10 disparate URLs at a time).
