@@ -20,12 +20,23 @@ class TestIsPrivateHost:
     def test_public_ip(self) -> None:
         assert is_private_host("8.8.8.8") is False
 
-    def test_public_hostname(self) -> None:
+    def test_public_hostname(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import socket
+
+        monkeypatch.setattr(
+            socket,
+            "getaddrinfo",
+            lambda *a, **k: [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))],
+        )
         assert is_private_host("example.com") is False
 
-    def test_host_with_port(self) -> None:
+    def test_bare_host_contract(self) -> None:
+        # is_private_host now requires a BARE host (callers pass urlparse().hostname,
+        # which strips the port). A port-suffixed string is not a valid host: it is
+        # unresolvable -> fail-closed -> treated as private. Do NOT split on ':'
+        # (that mangled IPv6, the original bug).
         assert is_private_host("localhost:8080") is True
-        assert is_private_host("example.com:443") is False
+        assert is_private_host("example.com:443") is True
 
 
 class TestFetchHtmlValidation:
