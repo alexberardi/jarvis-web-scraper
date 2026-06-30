@@ -212,12 +212,20 @@ async def fetch_html(url: str, config: FetchConfig | None = None) -> tuple[str, 
                 response = await _try_fetch(url, {"Accept": "*/*"})
                 response.raise_for_status()
             except httpx.HTTPStatusError:
+                # r.jina.ai is a third-party reader proxy — only egress to it
+                # when the caller has explicitly opted in. Off (default) ->
+                # fail closed by re-raising the original status error.
+                if not config.enable_jina_fallback:
+                    raise
                 proxy_url = f"https://r.jina.ai/{url}"
                 response = await _try_fetch(proxy_url, {"Accept": "text/plain"})
                 response.raise_for_status()
         else:
             raise
     except (httpx.RequestError, httpx.TimeoutException):
+        # Same opt-in gate for the connect/timeout fallback. Off -> re-raise.
+        if not config.enable_jina_fallback:
+            raise
         proxy_url = f"https://r.jina.ai/{url}"
         response = await _try_fetch(proxy_url, {"Accept": "text/plain"})
         response.raise_for_status()
