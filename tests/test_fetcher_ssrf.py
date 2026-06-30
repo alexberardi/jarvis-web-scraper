@@ -99,11 +99,18 @@ def test_ipv6_loopback_no_longer_bypasses() -> None:
     assert _ip_blocked(ipaddress.ip_address("::1")) is True
 
 
-def test_ipv4_mapped_caught_via_is_private_not_is_loopback() -> None:
-    # Guards against a future "simplify _ip_blocked to is_loopback" regression.
+def test_ipv4_mapped_loopback_is_blocked() -> None:
+    # IPv4-mapped IPv6 loopback must be blocked regardless of how the stdlib
+    # classifies it. NOTE: ipaddress changed in Python 3.11.10/3.12.4/3.13 so that
+    # IPv4-mapped addresses delegate is_loopback/is_private to the embedded IPv4
+    # (so ::ffff:127.0.0.1 .is_loopback is True on new patch releases, False on
+    # older ones). Pin the blocklist contract, not the version-dependent flag.
     mapped = ipaddress.ip_address("::ffff:127.0.0.1")
-    assert mapped.is_loopback is False  # would slip past an is_loopback-only check
     assert _ip_blocked(mapped) is True
+    # A mapped *non*-loopback private address (is_loopback False on every version)
+    # still must be blocked — proving the blocklist isn't just an is_loopback check.
+    assert ipaddress.ip_address("::ffff:10.0.0.1").is_loopback is False
+    assert _ip_blocked(ipaddress.ip_address("::ffff:10.0.0.1")) is True
 
 
 def test_nat64_reserved_canary() -> None:
