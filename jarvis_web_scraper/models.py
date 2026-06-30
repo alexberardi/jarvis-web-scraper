@@ -5,7 +5,12 @@ from dataclasses import dataclass, field
 
 @dataclass
 class FetchConfig:
-    """Configuration for HTTP fetching."""
+    """Configuration for HTTP fetching.
+
+    ``enable_jina_fallback`` controls the r.jina.ai third-party reader-proxy
+    fallback. It defaults OFF, so a fetch never egresses to an external proxy
+    unless the caller explicitly opts in.
+    """
 
     timeout: float = 15.0
     user_agent: str = (
@@ -15,6 +20,9 @@ class FetchConfig:
     )
     max_redirects: int = 5
     block_private_hosts: bool = True
+    # Controls the r.jina.ai third-party reader-proxy fallback. Defaults OFF: no
+    # external proxy egress unless the caller explicitly opts in.
+    enable_jina_fallback: bool = False
     headers: dict[str, str] = field(default_factory=dict)
 
 
